@@ -29,7 +29,7 @@ HEALTH_INTERVAL=2
 PY="/opt/conda/bin/python"
 JUPY="/opt/conda/bin/jupyter"
 
-log(){ echo "[$(date -u +%H:%M:%S)] $*" | tee -a "$LOG" ; }
+log(){ echo "[$(date -u +%H:%M:%S)] $*" | tee -a "$LOG"; }
 ensure_dirs(){
   mkdir -p /workspace/models /workspace/outputs /workspace/.cache "$LORA_DIR"
   touch "$LOG"
@@ -72,22 +72,23 @@ bootstrap_assets(){
     return 0
   fi
 
-  # Use Python (always available) to parse and emit lines: name|url|dest
-  $PY - <<'PYCODE' "$mf" | while IFS='|' read -r name url dest; do
+  # Parse manifest with Python and feed lines into while loop
+  while IFS='|' read -r name url dest; do
+    [ -n "${name:-}" ] || continue
+    fetch_one "$name" "$url" "$dest"
+  done < <(
+    "$PY" - "$mf" <<'PYCODE'
 import json, sys
 mf = sys.argv[1]
 data = json.load(open(mf))
-for item in data.get("items", []):
-    name = item.get("name","").strip()
-    url  = item.get("url","").strip()
-    dest = item.get("dest","").strip() or "/workspace/models"
+for it in data.get("items", []):
+    name = (it.get("name") or "").strip()
+    url  = (it.get("url")  or "").strip()
+    dest = (it.get("dest") or "/workspace/models").strip()
     if name and url:
         print(f"{name}|{url}|{dest}")
 PYCODE
-  do
-    [ -n "$name" ] || continue
-    fetch_one "$name" "$url" "$dest"
-  done
+  )
 }
 
 disable_sage_on_blackwell(){
@@ -100,7 +101,7 @@ disable_sage_on_blackwell(){
 
 start_jupyter(){
   if [ "${ENABLE_JUPYTER:-1}" = "1" ]; then
-    $JUPY lab --ip=0.0.0.0 --port="${JUPYTER_PORT}" \
+    "$JUPY" lab --ip=0.0.0.0 --port="${JUPYTER_PORT}" \
       --NotebookApp.token='' --NotebookApp.password='' >>"$LOG" 2>&1 &
     log "JupyterLab starting on :${JUPYTER_PORT}"
   fi
@@ -115,14 +116,14 @@ start_wan2gp(){
   fi
 
   # Enable hf_transfer if installed
-  if $PY - <<'PYX'; then
+  if "$PY" - <<'PYX'; then
 import importlib, sys
 sys.exit(0 if importlib.util.find_spec("hf_transfer") else 1)
 PYX
   then export HF_HUB_ENABLE_HF_TRANSFER=1; fi
 
   log "Starting Wan2GP on :${WAN2GP_PORT} (logs → $LOG)"
-  $PY "${WAN2GP_DIR}/wgp.py" --listen --server-port "${WAN2GP_PORT}" >>"$LOG" 2>&1 &
+  "$PY" "${WAN2GP_DIR}/wgp.py" --listen --server-port "${WAN2GP_PORT}" >>"$LOG" 2>&1 &
 }
 
 health_wait(){
