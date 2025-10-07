@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "notes": "Wan 2.2 Animate LoRAs mirrored via GitHub Releases.",
+  "items": [
+    {
+      "name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "url": "https://github.com/ArpitKhurana-ai/wan2gp-assets/releases/download/v1.0/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "dest": "loras/wan2.2-animate-lightning/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "size_mb": 704
+    },
+    {
+      "name": "Wan2.1_I2V_14B_FusionX_LoRA.safetensors",
+      "url": "https://github.com/ArpitKhurana-ai/wan2gp-assets/releases/download/v1.0/Wan2.1_I2V_14B_FusionX_LoRA.safetensors",
+      "dest": "loras/wan2.2-animate-lightning/Wan2.1_I2V_14B_FusionX_LoRA.safetensors",
+      "size_mb": 354
+    }
+  ]
+}
