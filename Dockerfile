@@ -36,10 +36,13 @@ RUN git clone --depth=1 ${WAN2GP_REPO} ${WAN2GP_DIR} && \
 # NOTE: Torch is already in the base image (cu128). We avoid re-installing here.
 RUN . ${VENV_DIR}/bin/activate && \
     python -V && \
+    pip install --no-deps "numpy<2.1" "cython<3.2" "setuptools<75" wheel && \
     if [ -f "${WAN2GP_DIR}/requirements.txt" ]; then \
       pip install --no-deps -r ${WAN2GP_DIR}/requirements.txt ; \
     fi && \
     pip install --no-deps \
+      accelerate transformers diffusers gradio timm einops safetensors pillow \
+      pydantic numpy psutil uvicorn fastapi jupyterlab hf_transfer
       accelerate \
       transformers \
       diffusers \
