@@ -101,9 +101,22 @@ disable_sage_on_blackwell(){
 
 start_jupyter(){
   if [ "${ENABLE_JUPYTER:-1}" = "1" ]; then
-    "$JUPY" lab --ip=0.0.0.0 --port="${JUPYTER_PORT}" \
-      --NotebookApp.token='' --NotebookApp.password='' >>"$LOG" 2>&1 &
-    log "JupyterLab starting on :${JUPYTER_PORT}"
+    log "Launching JupyterLab on :${JUPYTER_PORT}"
+    export PATH="/opt/conda/bin:$PATH"
+    nohup "$JUPY" lab \
+      --ip=0.0.0.0 \
+      --port="${JUPYTER_PORT}" \
+      --ServerApp.allow_origin='*' \
+      --ServerApp.disable_check_xsrf=True \
+      --NotebookApp.token='' \
+      --NotebookApp.password='' \
+      --no-browser >>"$LOG" 2>&1 &
+    sleep 3
+    if lsof -i :"${JUPYTER_PORT}" >/dev/null 2>&1; then
+      log "JupyterLab successfully bound to port ${JUPYTER_PORT}"
+    else
+      log "WARN: JupyterLab failed to start — check $LOG"
+    fi
   fi
 }
 
