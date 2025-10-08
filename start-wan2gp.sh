@@ -104,29 +104,39 @@ pip install --no-cache-dir jupyterlab==4.1.8 notebook==7.1.2 ipykernel --upgrade
 
 start_jupyter(){
   if [ "${ENABLE_JUPYTER:-1}" = "1" ]; then
-    log "Ensuring JupyterLab is installed..."
     export PATH="/opt/conda/bin:$PATH"
-    pip install --quiet --no-cache-dir jupyterlab==4.1.8 notebook==7.1.2 ipykernel --upgrade
+    log "Ensuring JupyterLab is installed and ready..."
+    pip install --quiet --no-cache-dir jupyterlab==4.1.8 notebook==7.1.2 ipykernel jupyter_core==5.7.2 --upgrade
 
-    log "Launching JupyterLab safely as root on :${JUPYTER_PORT}"
-    nohup /opt/conda/bin/jupyter lab \
+    # Create writable config location to avoid permission errors
+    mkdir -p /workspace/.jupyter
+    export JUPYTER_CONFIG_DIR=/workspace/.jupyter
+
+    log "Launching JupyterLab on :${JUPYTER_PORT}"
+    nohup /opt/conda/bin/python -m jupyterlab \
       --ip=0.0.0.0 \
       --port="${JUPYTER_PORT}" \
+      --no-browser \
       --allow-root \
       --ServerApp.allow_origin='*' \
-      --ServerApp.allow_remote_access=True \
       --ServerApp.disable_check_xsrf=True \
+      --ServerApp.allow_remote_access=True \
+      --ServerApp.root_dir=/workspace \
+      --ServerApp.preferred_dir=/workspace \
       --NotebookApp.token='' \
       --NotebookApp.password='' \
-      --no-browser >>"$LOG" 2>&1 &
-    sleep 6
+      --ServerApp.default_url=/lab >>"$LOG" 2>&1 &
+
+    sleep 8
 
     if lsof -i :"${JUPYTER_PORT}" >/dev/null 2>&1; then
       log "✅ JupyterLab successfully bound to port ${JUPYTER_PORT}"
     else
-      log "❌ JupyterLab failed to start or bind on port ${JUPYTER_PORT}"
-      tail -n 20 "$LOG" | grep -i "jupyter" || log "(no jupyter error found in log tail)"
+      log "❌ JupyterLab failed to bind on port ${JUPYTER_PORT}. Checking logs..."
+      tail -n 40 "$LOG" | grep -i jupyter || log "(no jupyter error in log tail)"
     fi
+  else
+    log "JupyterLab disabled by env (ENABLE_JUPYTER=0)"
   fi
 }
 
@@ -167,6 +177,10 @@ health_wait(){
 ensure_dirs
 log "=== BOOT $(date -u) | Wan2GP — ProbeAI (CUDA 12.8) ==="
 log "GPU: $(gpu_name)"
+
+export JUPYTER_PORT="${JUPYTER_PORT:-8888}"
+export ENABLE_JUPYTER=1
+
 
 disable_sage_on_blackwell
 prefetch_loras
