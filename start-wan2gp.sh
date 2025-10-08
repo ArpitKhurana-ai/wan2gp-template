@@ -115,18 +115,13 @@ start_wan2gp(){
     log "Auth enabled via env (user set)"
   fi
 
-  # Enable hf_transfer if installed
-  if $PY - <<'PYX'
-import importlib, sys
-sys.exit(0 if importlib.util.find_spec("hf_transfer") else 1)
-PYX
-  then
+# Enable hf_transfer if installed (safe inline check)
+  if $PY -c "import importlib, sys; sys.exit(0 if getattr(importlib, 'util', None) and importlib.util.find_spec('hf_transfer') else 1)"; then
     export HF_HUB_ENABLE_HF_TRANSFER=1
-    log "hf_transfer detected and enabled"
+    log 'hf_transfer detected and enabled'
   else
-    log "hf_transfer not found (skipping)"
+    log 'hf_transfer not found (skipping)'
   fi
-
 
   log "Starting Wan2GP on :${WAN2GP_PORT} (logs → $LOG)"
   "$PY" "${WAN2GP_DIR}/wgp.py" --listen --server-port "${WAN2GP_PORT}" >>"$LOG" 2>&1 &
