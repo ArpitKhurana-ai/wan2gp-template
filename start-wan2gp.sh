@@ -151,5 +151,7 @@ start_jupyter
 start_wan2gp
 health_wait
 
-# Keep container in foreground
-wait -n || true
+# Keep container alive indefinitely
+log "Wan2GP services launched. Container will stay alive."
+tail -f /dev/null
+
