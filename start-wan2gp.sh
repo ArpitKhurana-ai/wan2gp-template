@@ -99,26 +99,31 @@ disable_sage_on_blackwell(){
   fi
 }
 
+log "Ensuring JupyterLab is installed..."
+pip install --no-cache-dir jupyterlab==4.1.8 notebook==7.1.2 ipykernel --upgrade
+
 start_jupyter(){
   if [ "${ENABLE_JUPYTER:-1}" = "1" ]; then
     log "Launching JupyterLab on :${JUPYTER_PORT}"
     export PATH="/opt/conda/bin:$PATH"
-    nohup "$JUPY" lab \
+    nohup /opt/conda/bin/jupyter lab \
       --ip=0.0.0.0 \
       --port="${JUPYTER_PORT}" \
       --ServerApp.allow_origin='*' \
+      --ServerApp.allow_remote_access=True \
       --ServerApp.disable_check_xsrf=True \
       --NotebookApp.token='' \
       --NotebookApp.password='' \
       --no-browser >>"$LOG" 2>&1 &
-    sleep 3
+    sleep 5
     if lsof -i :"${JUPYTER_PORT}" >/dev/null 2>&1; then
       log "JupyterLab successfully bound to port ${JUPYTER_PORT}"
     else
-      log "WARN: JupyterLab failed to start — check $LOG"
+      log "WARN: JupyterLab failed to bind on port ${JUPYTER_PORT}"
     fi
   fi
 }
+
 
 start_wan2gp(){
   # Optional basic auth via env
