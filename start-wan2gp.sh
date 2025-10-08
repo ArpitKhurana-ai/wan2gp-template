@@ -104,22 +104,28 @@ pip install --no-cache-dir jupyterlab==4.1.8 notebook==7.1.2 ipykernel --upgrade
 
 start_jupyter(){
   if [ "${ENABLE_JUPYTER:-1}" = "1" ]; then
-    log "Launching JupyterLab on :${JUPYTER_PORT}"
+    log "Ensuring JupyterLab is installed..."
     export PATH="/opt/conda/bin:$PATH"
+    pip install --quiet --no-cache-dir jupyterlab==4.1.8 notebook==7.1.2 ipykernel --upgrade
+
+    log "Launching JupyterLab safely as root on :${JUPYTER_PORT}"
     nohup /opt/conda/bin/jupyter lab \
       --ip=0.0.0.0 \
       --port="${JUPYTER_PORT}" \
+      --allow-root \
       --ServerApp.allow_origin='*' \
       --ServerApp.allow_remote_access=True \
       --ServerApp.disable_check_xsrf=True \
       --NotebookApp.token='' \
       --NotebookApp.password='' \
       --no-browser >>"$LOG" 2>&1 &
-    sleep 5
+    sleep 6
+
     if lsof -i :"${JUPYTER_PORT}" >/dev/null 2>&1; then
-      log "JupyterLab successfully bound to port ${JUPYTER_PORT}"
+      log "✅ JupyterLab successfully bound to port ${JUPYTER_PORT}"
     else
-      log "WARN: JupyterLab failed to bind on port ${JUPYTER_PORT}"
+      log "❌ JupyterLab failed to start or bind on port ${JUPYTER_PORT}"
+      tail -n 20 "$LOG" | grep -i "jupyter" || log "(no jupyter error found in log tail)"
     fi
   fi
 }
