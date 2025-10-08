@@ -70,12 +70,19 @@ prefetch_loras(){
 }
 
 sync_loras(){
-  log "Syncing LoRAs..."
-  mkdir -p "$WAN2GP_LORA_DIR"
-  find "$LORA_CACHE_DIR" -type f -name "*.safetensors" -exec cp -u {} "$WAN2GP_LORA_DIR"/ \; || true
-  ln -sf "$WAN2GP_LORA_DIR" /workspace/models/loras
-  ln -sf "$WAN2GP_LORA_DIR" /opt/Wan2GP/loras
-  log "✅ LoRAs flattened and linked → $WAN2GP_LORA_DIR"
+  log "Syncing LoRAs into Wan2GP..."
+  mkdir -p "$WAN2GP_DIR/models/loras"
+
+  # Copy any .safetensors from anywhere inside workspace/loras into models/loras
+  find "$LORA_CACHE_DIR" -type f -name "*.safetensors" -exec cp -u {} "$WAN2GP_DIR/models/loras"/ \; || true
+
+  # Create convenient symlink for visibility
+  ln -sf "$WAN2GP_DIR/models/loras" /workspace/loras
+  ln -sf "$WAN2GP_DIR/models/loras" /workspace/models/loras
+
+  log "✅ LoRAs synced to: $WAN2GP_DIR/models/loras"
+  log "🧾 Listing current LoRAs:"
+  ls -lh "$WAN2GP_DIR/models/loras" | tee -a "$LOG" || true
 }
 
 cleanup_old_loras(){
