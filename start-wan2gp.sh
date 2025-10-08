@@ -116,7 +116,7 @@ start_wan2gp(){
   fi
 
   # Enable hf_transfer if installed
-  if $PY - <<'PYX'; then
+  if $PY - <<'PYX'
 import importlib, sys
 sys.exit(0 if importlib.util.find_spec("hf_transfer") else 1)
 PYX
@@ -126,6 +126,7 @@ PYX
   else
     log "hf_transfer not found (skipping)"
   fi
+
 
   log "Starting Wan2GP on :${WAN2GP_PORT} (logs → $LOG)"
   "$PY" "${WAN2GP_DIR}/wgp.py" --listen --server-port "${WAN2GP_PORT}" >>"$LOG" 2>&1 &
