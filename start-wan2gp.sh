@@ -70,19 +70,20 @@ prefetch_loras(){
 }
 
 sync_loras(){
-  log "Syncing LoRAs into Wan2GP..."
-  mkdir -p "$WAN2GP_DIR/models/loras"
+  log "Syncing LoRAs into Wan2GP (correct internal path)..."
+  mkdir -p "$WAN2GP_DIR/wan2gp/models/loras"
 
-  # Copy any .safetensors from anywhere inside workspace/loras into models/loras
-  find "$LORA_CACHE_DIR" -type f -name "*.safetensors" -exec cp -u {} "$WAN2GP_DIR/models/loras"/ \; || true
+  # Copy .safetensors into the internal models path
+  find "$LORA_CACHE_DIR" -type f -name "*.safetensors" -exec cp -u {} "$WAN2GP_DIR/wan2gp/models/loras"/ \; || true
 
-  # Create convenient symlink for visibility
-  ln -sf "$WAN2GP_DIR/models/loras" /workspace/loras
-  ln -sf "$WAN2GP_DIR/models/loras" /workspace/models/loras
+  # Create convenient symlinks for Jupyter and UI visibility
+  ln -sf "$WAN2GP_DIR/wan2gp/models/loras" /workspace/loras
+  ln -sf "$WAN2GP_DIR/wan2gp/models/loras" /workspace/models/loras
+  ln -sf "$WAN2GP_DIR/wan2gp/models/loras" "$WAN2GP_DIR/models/loras"
 
-  log "✅ LoRAs synced to: $WAN2GP_DIR/models/loras"
+  log "✅ LoRAs synced to: $WAN2GP_DIR/wan2gp/models/loras"
   log "🧾 Listing current LoRAs:"
-  ls -lh "$WAN2GP_DIR/models/loras" | tee -a "$LOG" || true
+  ls -lh "$WAN2GP_DIR/wan2gp/models/loras" | tee -a "$LOG" || true
 }
 
 cleanup_old_loras(){
