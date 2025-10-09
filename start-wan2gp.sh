@@ -11,8 +11,8 @@ WAN2GP_USERNAME="${WAN2GP_USERNAME:-}"
 WAN2GP_PASSWORD="${WAN2GP_PASSWORD:-}"
 
 # ---- LoRA CONFIG ----
-LORA_CACHE_DIR="${LORA_CACHE_DIR:-/workspace/loras_cache}"   # temp cache
-WAN2GP_LORA_DIR="${WAN2GP_LORA_DIR:-/opt/Wan2GP/loras}"     # ✅ official path for Wan2GP
+LORA_CACHE_DIR="${LORA_CACHE_DIR:-/workspace/loras_cache}"       # temp cache
+WAN2GP_LORA_DIR="${WAN2GP_LORA_DIR:-/opt/Wan2GP/loras_i2v}"     # ✅ correct for Animate/I2V
 LORA1_NAME="lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"
 LORA1_URL="https://github.com/ArpitKhurana-ai/wan2gp-assets/releases/download/v1.0/${LORA1_NAME}"
 LORA2_NAME="Wan2.1_I2V_14B_FusionX_LoRA.safetensors"
@@ -63,10 +63,10 @@ prefetch_loras(){
 }
 
 sync_loras(){
-  log "🔄 Syncing LoRAs to official Wan2GP path..."
+  log "📦 Placing LoRAs in correct folder for Wan2.2 Animate (loras_i2v)..."
   mkdir -p "$WAN2GP_LORA_DIR"
   find "$LORA_CACHE_DIR" -maxdepth 1 -type f -name "*.safetensors" -exec cp -u {} "$WAN2GP_LORA_DIR"/ \; || true
-  ln -sf "$WAN2GP_LORA_DIR" /workspace/loras        # visible for user
+  ln -sf "$WAN2GP_LORA_DIR" /workspace/loras
   log "✅ LoRAs placed in: $WAN2GP_LORA_DIR"
   ls -lh "$WAN2GP_LORA_DIR" | tee -a "$LOG" || true
 }
@@ -154,7 +154,7 @@ health_wait(){
 
 # ================= EXECUTION =================
 ensure_dirs
-log "=== BOOT $(date -u) | Wan2GP Optimized v4 ==="
+log "=== BOOT $(date -u) | Wan2GP Optimized v5 (loras_i2v) ==="
 log "GPU: $(gpu_name) | VRAM: $(gpu_mem_gb) GB"
 
 oom_prevention
