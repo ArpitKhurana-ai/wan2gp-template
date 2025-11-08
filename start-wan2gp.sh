@@ -91,6 +91,57 @@ sync_wan2gp_code() {
   log "✅ Wan2GP synced @ $rev"
 }
 
+# ================= HOTFIX: MatAnyOne SAM guard =================
+apply_matanyone_hotfix() {
+  local target="${WAN2GP_DIR}/preprocessing/matanyone/app.py"
+  if [ ! -f "$target" ]; then
+    log "ℹ️ MatAnyOne file not found yet; skipping hotfix"
+    return 0
+  fi
+
+  # Only patch if not already present
+  if ! grep -q "HOTFIX: ensure a default SAM if none" "$target" 2>/dev/null; then
+    log "🩹 Applying MatAnyOne hotfix (default SAM if matanyone_model is None)"
+    $PY - "$target" <<'PY' || { echo "[hotfix] failed"; exit 1; }
+import io,sys,re,os
+p=sys.argv[1]
+s=open(p,'r',encoding='utf-8').read()
+
+pattern=r"(def\s+select_SAM\(state\):\s*\n\s*global\s+matanyone_model\s*\n)"
+inject=(
+    r"\1"
+    r"    # HOTFIX: ensure a default SAM if none\n"
+    r"    if matanyone_model is None:\n"
+    r"        try:\n"
+    r"            from .sam import build_sam_model\n"
+    r"            matanyone_model = build_sam_model('sam2_t')  # fast, safe default\n"
+    r"        except Exception as e:\n"
+    r"            raise RuntimeError(f'MatAnyOne SAM init failed: {e}')\n"
+)
+
+new, n = re.subn(pattern, "".join(inject), s, count=1, flags=re.M)
+if n==0:
+    # Fallback: try adding right after function start even if formatting differs
+    s = s.replace("def select_SAM(state):\n    global matanyone_model\n",
+                  "def select_SAM(state):\n    global matanyone_model\n"
+                  "    # HOTFIX: ensure a default SAM if none\n"
+                  "    if matanyone_model is None:\n"
+                  "        try:\n"
+                  "            from .sam import build_sam_model\n"
+                  "            matanyone_model = build_sam_model('sam2_t')  # fast, safe default\n"
+                  "        except Exception as e:\n"
+                  "            raise RuntimeError(f'MatAnyOne SAM init failed: {e}')\n")
+else:
+    s = new
+
+open(p,'w',encoding='utf-8').write(s)
+print("[hotfix] MatAnyOne patched")
+PY
+  else
+    log "✔️ MatAnyOne hotfix already present"
+  fi
+}
+
 # ================= CORE OPS =================
 fetch_one(){
   local name="$1"; local url="$2"; local dest="$3"; local path="${dest%/}/$name"
@@ -191,6 +242,8 @@ oom_prevention
 hf_transfer_cache
 # ⬇️ one-time update to the pinned commit, then locked
 sync_wan2gp_code
+# ⬇️ patch MatAnyOne so Load Video never fails when SAM isn't preloaded
+apply_matanyone_hotfix
 prefetch_loras
 sync_loras
 cleanup_old_loras
