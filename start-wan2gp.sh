@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 # ================= CONFIG =================
 WAN2GP_PORT="${WAN2GP_PORT:-7862}"
-JUPYTER_PORT="${JUPYTER_PORT:-8888}"
 WAN2GP_DIR="${WAN2GP_DIR:-/opt/Wan2GP}"
 LOG="${WAN2GP_LOG:-/workspace/wan2gp.log}"
 
@@ -39,6 +38,58 @@ ensure_dirs(){
 
 gpu_name(){ nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1 || echo unknown; }
 gpu_mem_gb(){ nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | awk '{print int($1/1024)}' || echo 0; }
+
+# ================= WAN2GP AUTO-UPDATE (one-time sync + lock) =================
+WAN2GP_REPO="${WAN2GP_REPO:-https://github.com/deepbeepmeep/Wan2GP.git}"
+# Pinned tested commit (Nov 8, 2025). Change this only when you want to refresh.
+WAN2GP_REF="${WAN2GP_REF:-bdfa6b272409b35a4ac8369502ba3cd7e7f72f90}"
+# Locked by default (no nightlies). Set to 0 to re-sync to WAN2GP_REF again on next boot.
+WAN2GP_LOCK="${WAN2GP_LOCK:-1}"
+
+sync_wan2gp_code() {
+  log "🔁 Sync Wan2GP code → $WAN2GP_REF (lock=$WAN2GP_LOCK)"
+  if [ "${WAN2GP_LOCK}" = "1" ] && [ -d "${WAN2GP_DIR}/.git" ]; then
+    local cur
+    cur="$(git -C "${WAN2GP_DIR}" rev-parse HEAD 2>/dev/null || echo 'unknown')"
+    if [ "$cur" = "$WAN2GP_REF" ]; then
+      log "🔒 Already at pinned ref; skipping update."
+      return
+    fi
+  fi
+
+  if command -v git >/dev/null 2>&1; then
+    if [ ! -d "${WAN2GP_DIR}/.git" ]; then
+      rm -rf "${WAN2GP_DIR}"
+      git clone --depth=1 "$WAN2GP_REPO" "${WAN2GP_DIR}" >>"$LOG" 2>&1
+    fi
+    pushd "${WAN2GP_DIR}" >/dev/null
+    git fetch --depth=1 origin >>"$LOG" 2>&1 || true
+    # checkout the exact ref (commit, tag, or branch)
+    git checkout -q "$WAN2GP_REF" >>"$LOG" 2>&1 || {
+      log "⚠️ git checkout failed for $WAN2GP_REF; trying to fetch specific ref"
+      git fetch origin "$WAN2GP_REF" >>"$LOG" 2>&1 || true
+      git checkout -q "$WAN2GP_REF" >>"$LOG" 2>&1 || { log "❌ could not checkout $WAN2GP_REF"; exit 1; }
+    }
+    popd >/dev/null
+  else
+    # Fallback: download zip for the commit
+    log "ℹ️ git not found; downloading zip for $WAN2GP_REF"
+    rm -rf "${WAN2GP_DIR}" /workspace/_wan2gp_zip
+    mkdir -p /workspace/_wan2gp_zip
+    curl -fL "https://github.com/deepbeepmeep/Wan2GP/archive/${WAN2GP_REF}.zip" -o /workspace/_wan2gp_zip/Wan2GP.zip
+    unzip -q /workspace/_wan2gp_zip/Wan2GP.zip -d /workspace/_wan2gp_zip
+    mv "/workspace/_wan2gp_zip/Wan2GP-${WAN2GP_REF}" "${WAN2GP_DIR}"
+    rm -rf /workspace/_wan2gp_zip
+  fi
+
+  # (Re)install python deps if requirements changed
+  if [ -f "${WAN2GP_DIR}/requirements.txt" ]; then
+    pip install --no-cache-dir -r "${WAN2GP_DIR}/requirements.txt" >>"$LOG" 2>&1 || true
+  fi
+
+  local rev; rev=$(git -C "${WAN2GP_DIR}" rev-parse --short HEAD 2>/dev/null || echo "$WAN2GP_REF")
+  log "✅ Wan2GP synced @ $rev"
+}
 
 # ================= CORE OPS =================
 fetch_one(){
@@ -109,27 +160,6 @@ hf_transfer_cache(){
   fi
 }
 
-# ================= JUPYTER =================
-start_jupyter(){
-  if [ "${ENABLE_JUPYTER:-1}" = "1" ]; then
-    export PATH="/opt/conda/bin:$PATH"
-    if ! command -v jupyter >/dev/null 2>&1; then
-      log "📦 Installing Jupyter (first-time only)..."
-      pip install --no-cache-dir jupyterlab==4.1.8 notebook==7.1.2 ipykernel jupyter_core==5.7.2
-    fi
-    mkdir -p /workspace/.jupyter
-    export JUPYTER_CONFIG_DIR=/workspace/.jupyter
-    log "🚀 Launching JupyterLab on port ${JUPYTER_PORT}"
-    nohup jupyter lab --ip=0.0.0.0 --port="${JUPYTER_PORT}" --no-browser \
-      --allow-root --ServerApp.allow_origin='*' --ServerApp.disable_check_xsrf=True \
-      --ServerApp.allow_remote_access=True --ServerApp.root_dir=/workspace \
-      --NotebookApp.token='' --NotebookApp.password='' \
-      --ServerApp.default_url=/lab >>"$LOG" 2>&1 &
-    sleep 5
-    lsof -i :"${JUPYTER_PORT}" >/dev/null 2>&1 && log "✅ Jupyter ready" || log "❌ Jupyter failed to bind"
-  fi
-}
-
 # ================= WAN2GP =================
 start_wan2gp(){
   if [ -n "$WAN2GP_USERNAME" ] && [ -n "$WAN2GP_PASSWORD" ]; then
@@ -159,12 +189,13 @@ log "GPU: $(gpu_name) | VRAM: $(gpu_mem_gb) GB"
 
 oom_prevention
 hf_transfer_cache
+# ⬇️ one-time update to the pinned commit, then locked
+sync_wan2gp_code
 prefetch_loras
 sync_loras
 cleanup_old_loras
-start_jupyter &
 start_wan2gp
 health_wait
 
-log "✅ Wan2GP + Jupyter launched — Optimized Boot Complete."
+log "✅ Wan2GP launched — Optimized Boot Complete."
 tail -f /dev/null
