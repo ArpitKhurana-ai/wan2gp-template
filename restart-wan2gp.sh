@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-pkill -9 -f "python.*wgp.py" || true
+pkill -f "wgp.py" || true
 sleep 1
-/opt/start-wan2gp.sh
+exec /opt/start-wan2gp.sh
