@@ -211,6 +211,32 @@ hf_transfer_cache(){
   fi
 }
 
+# ---- RAM hardening (add before start_wan2gp) ----
+enable_swap() {
+  # 16G swap to avoid container OOM; idempotent
+  if ! grep -q "/workspace/wan2gp.swap" /proc/swaps 2>/dev/null; then
+    fallocate -l 16G /workspace/wan2gp.swap || dd if=/dev/zero of=/workspace/wan2gp.swap bs=1G count=16
+    chmod 600 /workspace/wan2gp.swap
+    mkswap /workspace/wan2gp.swap >/dev/null 2>&1 || true
+    swapon /workspace/wan2gp.swap  >/dev/null 2>&1 || true
+    log "🛟 Swap enabled (16G) to prevent RAM OOM."
+  fi
+}
+
+tune_runtime() {
+  # keep queues small (avoid multiple in-flight jobs holding frames in RAM)
+  export GRADIO_NUM_WORKERS=1
+  export GRADIO_CONCURRENCY_COUNT=1
+  export UV_THREADPOOL_SIZE=8
+  # hint mmgp to reserve less RAM if supported (safe if ignored)
+  export MMGP_RESERVED_RAM_GB=10
+  # avoid huge Python object caches
+  export PYTHONUNBUFFERED=1
+}
+
+enable_swap
+tune_runtime
+
 # ================= WAN2GP =================
 start_wan2gp(){
   if [ -n "$WAN2GP_USERNAME" ] && [ -n "$WAN2GP_PASSWORD" ]; then
