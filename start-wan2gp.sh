@@ -3,14 +3,14 @@ set -Eeuo pipefail
 
 LOG="${WAN2GP_LOG:-/workspace/wan2gp.log}"
 WAN2GP_DIR="${WAN2GP_DIR:-/opt/Wan2GP}"
-PY="/opt/conda/bin/python"        # use the conda Python from base image
+PY="/opt/conda/bin/python"
 PORT="${WAN2GP_PORT:-7862}"
 
 mkdir -p /workspace/outputs /workspace/.cache "$(dirname "$LOG")" \
          /workspace/hf-home /workspace/hf-cache /workspace/.torchinductor
 touch "$LOG"
 
-# Optional 16G swap to avoid RAM OOM on heavy scenes
+# 16G swap (best-effort)
 if ! grep -q "/workspace/wan2gp.swap" /proc/swaps 2>/dev/null; then
   (fallocate -l 16G /workspace/wan2gp.swap || dd if=/dev/zero of=/workspace/wan2gp.swap bs=1G count=16) || true
   chmod 600 /workspace/wan2gp.swap || true
@@ -18,24 +18,21 @@ if ! grep -q "/workspace/wan2gp.swap" /proc/swaps 2>/dev/null; then
   swapon /workspace/wan2gp.swap  >/dev/null 2>&1 || true
 fi
 
-# Keep queues small for stable memory
+# memory-friendly defaults
 export GRADIO_NUM_WORKERS=1
 export GRADIO_CONCURRENCY_COUNT=1
 export UV_THREADPOOL_SIZE=8
-export MMGP_RESERVED_RAM_GB=10  # hint for mmgp if supported
+export MMGP_RESERVED_RAM_GB=10
 
-# Wire ffmpeg args into Wan2GP (UI picks these defaults)
+# ffmpeg defaults (override by env if needed)
 export WANGP_FFMPEG_VIDEO="${WANGP_FFMPEG_VIDEO:-"-c:v h264_nvenc -preset p1 -rc vbr -cq 22 -pix_fmt yuv420p -vf scale=trunc(iw/16)*16:trunc(ih/16)*16"}"
 export WANGP_FFMPEG_AUDIO="${WANGP_FFMPEG_AUDIO:-"-c:a aac -b:a 128k"}"
 
 echo "[$(date -u +%H:%M:%S)] === BOOT $(date -u) | Wan2GP Docker Optimized ===" | tee -a "$LOG"
-
-# Start Wan2GP UI
 echo "[$(date -u +%H:%M:%S)] 🚀 Starting Wan2GP on :$PORT" | tee -a "$LOG"
 cd "$WAN2GP_DIR"
 "$PY" wgp.py --listen --server-port "$PORT" >>"$LOG" 2>&1 &
 
-# Health wait
 echo "[$(date -u +%H:%M:%S)] ⌛ Waiting for UI ..." | tee -a "$LOG"
 for i in $(seq 1 180); do
   if curl -fs "http://127.0.0.1:${PORT}/" >/dev/null 2>&1; then
