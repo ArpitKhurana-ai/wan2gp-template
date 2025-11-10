@@ -16,7 +16,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HUGGINGFACE_HUB_CACHE=/workspace/hf-cache \
     XDG_CACHE_HOME=/workspace/.cache \
     HF_HUB_ENABLE_HF_TRANSFER=1 \
-    MKL_THREADING_LAYER=GNU
+    MKL_THREADING_LAYER=GNU \
+    # ---- Gradio behind proxy hardening (baked in; no need to add in template) ----
+    GRADIO_SERVER_NAME=0.0.0.0 \
+    GRADIO_SERVER_PORT=7862 \
+    GRADIO_ROOT_PATH=/ \
+    GRADIO_ALLOW_FLAGGING=never \
+    GRADIO_SHARE=False \
+    GRADIO_USE_CDN=False
 
 # Use the base image’s conda Python (Torch already present here)
 ENV PATH="/opt/conda/bin:${PATH}"
@@ -47,12 +54,14 @@ RUN python -V && \
     if [ -f "${WAN2GP_DIR}/requirements.txt" ]; then \
       python -m pip install -r ${WAN2GP_DIR}/requirements.txt ; \
     fi && \
+    # ---- Pin gradio to a stable v4 to avoid blank-UI regressions with v5+ ----
     python -m pip install \
-      accelerate transformers diffusers gradio timm einops safetensors pillow \
+      "gradio==4.44.1" \
+      accelerate transformers diffusers timm einops safetensors pillow \
       pydantic numpy psutil uvicorn fastapi jupyterlab hf_transfer huggingface_hub && \
     python - <<'PY'
-import torch, transformers, diffusers, numpy, huggingface_hub
-print("Sanity:", torch.__version__, transformers.__version__, diffusers.__version__, numpy.__version__, huggingface_hub.__version__)
+import torch, transformers, diffusers, numpy, huggingface_hub, gradio
+print("Sanity:", torch.__version__, transformers.__version__, diffusers.__version__, numpy.__version__, huggingface_hub.__version__, gradio.__version__)
 PY
 
 # ---- Prefetch LoRAs into the image so first job is instant ----
